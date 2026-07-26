@@ -9,7 +9,7 @@ jobs:
     steps:
       - name: Maximize Disk Space
         run: |
-          echo "Removing heavy unnecessary components..."
+          echo "Freeing up disk space..."
           sudo rm -rf /Library/Developer/CommandLineTools
           sudo rm -rf /Applications/Xcode*.app
           sudo rm -rf /usr/local/share/dotnet
@@ -22,26 +22,26 @@ jobs:
 
       - name: Stream Extract ZIP Directly
         run: |
-          echo "Downloading and extracting directly in one step..."
+          echo "Downloading and extracting directly..."
           curl -L "https://github.com/bahramsmoke/ios-app-test/releases/download/v1.0/Bahram-Kurd-iPhone-iPad-Xcode-v2.0.zip" | python3 -c "
           import sys, zipfile, io
           buffer = io.BytesIO(sys.stdin.buffer.read())
           with zipfile.ZipFile(buffer) as zip_ref:
               zip_ref.extractall('.')
           "
-          echo "Extraction complete. Listing files:"
-          ls -R
+          echo "Extraction complete."
 
-      - name: Locate and Build IPA
+      - name: Search and Build IPA
         run: |
           mkdir -p build/ipa
           
-          # پیدا کردن فایل .xcworkspace یا .xcodeproj در هر عمقی
-          WORKSPACE=$(find . -name "*.xcworkspace" | head -n 1)
-          PROJECT=$(find . -name "*.xcodeproj" | head -n 1)
+          # پیدا کردن بازگشتی تمام فایل‌های پروژه یا ورک‌اسپیس
+          WORKSPACE=$(find . -name "*.xcworkspace" -print -quit)
+          PROJECT=$(find . -name "*.xcodeproj" -print -quit)
           
           if [ -n "$WORKSPACE" ]; then
             echo "Found Workspace: $WORKSPACE"
+            # پیدا کردن Scheme (به احتمال زیاد اسمش App است)
             SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list | grep -A 1 "Schemes:" | tail -n 1 | tr -d '[:space:]')
             if [ -z "$SCHEME" ] || [ "$SCHEME" == "Schemes:" ]; then SCHEME="App"; fi
             echo "Using Scheme: $SCHEME"
@@ -53,17 +53,19 @@ jobs:
             echo "Using Scheme: $SCHEME"
             xcodebuild archive -project "$PROJECT" -scheme "$SCHEME" -archivePath build/App.xcarchive CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
           else
-            echo "Error: No Xcode project or workspace found!"
+            echo "Error: No Xcode project found anywhere in the extracted files!"
+            ls -R
             exit 1
           fi
           
-          # تبدیل Archive به IPA واقعی
+          # بسته‌بندی IPA از روی آرشیو ساخته شده
           if [ -d "build/App.xcarchive" ]; then
             mkdir -p Payload
             cp -r build/App.xcarchive/Products/Applications/*.app Payload/
             zip -r build/ipa/BahramApp.ipa Payload
+            echo "IPA created successfully."
           else
-            echo "Error: Build failed, no archive created!"
+            echo "Error: Xcode build failed to create an archive."
             exit 1
           fi
 
@@ -71,5 +73,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ios-app-ipa
-          path: |
-            build/ipa/*.ipa
+          path: build/ipa/*.ipa
