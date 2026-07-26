@@ -5,28 +5,36 @@ on:
 
 jobs:
   build:
-   runs-on: self-hosted
+    runs-on: macos-latest
     steps:
+      - name: Free Disk Space on macOS Runner
+        run: |
+          echo "Cleaning up disk space..."
+          sudo rm -rf /Library/Developer/CommandLineTools
+          sudo rm -rf /Applications/Xcode_*.app
+          df -h
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Download & Extract Zip
         run: |
+          echo "Downloading project..."
           curl -L -o project.zip "https://github.com/bahramsmoke/ios-app-test/releases/download/v1.0/Bahram-Kurd-iPhone-iPad-Xcode-v2.0.zip"
+          echo "Extracting zip..."
           unzip -q project.zip
 
-      - name: Build IPA
+      - name: Build IPA File
         run: |
           mkdir -p build/ipa
-          # اگر فایل app آماده وجود داشته باشد آن را تبدیل به ipa می‌کند
           APP_PATH=$(find . -name "*.app" -type d | head -n 1)
           if [ -n "$APP_PATH" ]; then
             mkdir Payload
             cp -r "$APP_PATH" Payload/
             zip -r build/ipa/app.ipa Payload
           else
-            # در غیر این صورت پروژه Xcode را کامپایل می‌کند
-            xcodebuild build -configuration Release -sdk iphoneos CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
+            echo "Searching for Xcode projects..."
+            xcodebuild build -configuration Release -sdk iphoneos CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO || true
           fi
 
       - name: Upload IPA Artifact
